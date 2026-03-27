@@ -1,0 +1,45 @@
+services:
+  claude:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: dangerously-safe-container:latest
+    container_name: dangerously-safe-claude
+
+    deploy:
+      resources:
+        limits:
+          cpus: "${CLAUDE_CPUS:-4.0}"
+          memory: "${CLAUDE_MEMORY:-4g}"
+        reservations:
+          cpus: "0.5"
+          memory: "512m"
+
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+    volumes:
+      # Host workspace — WORKSPACE_DIR is set by run.sh to the caller's cwd
+      - "${WORKSPACE_DIR:-.}:/workspace:rw"
+      # Persistent Claude config, history, and sessions
+      - claude-config:/home/claude/.claude
+
+    environment:
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:?ANTHROPIC_API_KEY must be set}"
+      ANTHROPIC_BASE_URL: "${ANTHROPIC_BASE_URL:-}"
+      CLAUDE_MODEL: "${CLAUDE_MODEL:-}"
+      NO_COLOR: "${NO_COLOR:-}"
+      TERM: "${TERM:-xterm-256color}"
+      CLAUDE_CODE_DISABLE_AUTOUPDATE: "1"
+
+    working_dir: /workspace
+
+    stdin_open: true
+    tty: true
+    restart: "no"
+
+volumes:
+  claude-config:
+    name: dangerously-safe-claude-config
