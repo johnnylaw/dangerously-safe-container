@@ -148,12 +148,11 @@ RESUME_ARGS=()
 if [[ -n "${RESUME_HASH:-}" ]]; then
   RESUME_ARGS+=(--resume "$RESUME_HASH")
 fi
-
 exec docker compose \
   --project-directory "$SCRIPT_DIR" \
   run \
   "${DOCKER_FLAGS[@]}" \
   claude \
   --dangerously-skip-permissions \
-  "${RESUME_ARGS[@]}" \
+  "${RESUME_ARGS[@]+"${RESUME_ARGS[@]}"}" \
   "$@"
