@@ -25,11 +25,92 @@ CLAUDE_HOME_DIR="${CLAUDE_HOME_DIR:-${HOME}/.dangerously-safe-container/claude-h
 export CLAUDE_HOME_DIR
 
 # Initialize the host home dir on first run so the container has what it needs
-if [[ ! -d "${CLAUDE_HOME_DIR}/.claude/backups" ]]; then
-  mkdir -p "${CLAUDE_HOME_DIR}/.claude/backups"
-fi
+mkdir -p "${CLAUDE_HOME_DIR}/.claude/backups"
 if [[ ! -f "${CLAUDE_HOME_DIR}/.claude.json" ]]; then
   echo '{}' > "${CLAUDE_HOME_DIR}/.claude.json"
+fi
+
+# Sync GSD from this machine's ~/.claude into the container's claude home.
+# Only copies when the host version differs from the container's installed version.
+HOST_CLAUDE="${HOME}/.claude"
+CONTAINER_CLAUDE="${CLAUDE_HOME_DIR}/.claude"
+HOST_GSD_VERSION_FILE="${HOST_CLAUDE}/get-shit-done/VERSION"
+
+if [[ -f "$HOST_GSD_VERSION_FILE" ]]; then
+  HOST_GSD_VER=$(cat "$HOST_GSD_VERSION_FILE")
+  CONTAINER_GSD_VER=$(cat "${CONTAINER_CLAUDE}/get-shit-done/VERSION" 2>/dev/null || echo "")
+
+  if [[ "$HOST_GSD_VER" != "$CONTAINER_GSD_VER" ]]; then
+    echo "Syncing GSD ${HOST_GSD_VER} into container home..."
+
+    # Core GSD engine (workflows, bin, references, templates)
+    mkdir -p "${CONTAINER_CLAUDE}/get-shit-done"
+    cp -r "${HOST_CLAUDE}/get-shit-done/." "${CONTAINER_CLAUDE}/get-shit-done/"
+
+    # Slash commands
+    mkdir -p "${CONTAINER_CLAUDE}/commands/gsd"
+    cp -r "${HOST_CLAUDE}/commands/gsd/." "${CONTAINER_CLAUDE}/commands/gsd/"
+
+    # Agent definitions (gsd-* only — pragmatic-engineer et al. not GSD-owned)
+    mkdir -p "${CONTAINER_CLAUDE}/agents"
+    cp -f "${HOST_CLAUDE}"/agents/gsd-*.md "${CONTAINER_CLAUDE}/agents/" 2>/dev/null || true
+
+    # Hooks (gsd-* only)
+    mkdir -p "${CONTAINER_CLAUDE}/hooks"
+    cp -f "${HOST_CLAUDE}"/hooks/gsd-*.js "${CONTAINER_CLAUDE}/hooks/" 2>/dev/null || true
+
+    # Manifest + package.json (needed by GSD tools)
+    cp -f "${HOST_CLAUDE}/gsd-file-manifest.json" "${CONTAINER_CLAUDE}/" 2>/dev/null || true
+    cp -f "${HOST_CLAUDE}/package.json" "${CONTAINER_CLAUDE}/" 2>/dev/null || true
+  fi
+
+  # Write settings.json on first run — points hooks at container-local paths
+  if [[ ! -f "${CONTAINER_CLAUDE}/settings.json" ]]; then
+    cat > "${CONTAINER_CLAUDE}/settings.json" <<'SETTINGS'
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/claude/.claude/hooks/gsd-check-update.js\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/claude/.claude/hooks/gsd-context-monitor.js\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/claude/.claude/hooks/gsd-prompt-guard.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "node \"/home/claude/.claude/hooks/gsd-statusline.js\""
+  }
+}
+SETTINGS
+  fi
 fi
 
 # Load .env if present next to this script
