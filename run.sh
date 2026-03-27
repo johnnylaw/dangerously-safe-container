@@ -8,6 +8,9 @@
 #
 # From any project directory:
 #   cd ~/my-project && /path/to/dangerously-safe-container/run.sh
+#
+# Resume a previous session:
+#   RESUME_HASH=<hash> ./run.sh     # or via: make run RESUME=<hash>
 
 set -euo pipefail
 
@@ -16,6 +19,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # The directory to mount as /workspace — defaults to wherever you called run.sh from
 WORKSPACE_DIR="${WORKSPACE_DIR:-$(pwd)}"
 export WORKSPACE_DIR
+
+# The directory to mount as /home/claude — persists sessions, config, and history
+CLAUDE_HOME_DIR="${CLAUDE_HOME_DIR:-${HOME}/.dangerously-safe-container/claude-home}"
+export CLAUDE_HOME_DIR
+
+# Initialize the host home dir on first run so the container has what it needs
+if [[ ! -d "${CLAUDE_HOME_DIR}/.claude/backups" ]]; then
+  mkdir -p "${CLAUDE_HOME_DIR}/.claude/backups"
+fi
+if [[ ! -f "${CLAUDE_HOME_DIR}/.claude.json" ]]; then
+  echo '{}' > "${CLAUDE_HOME_DIR}/.claude.json"
+fi
 
 # Load .env if present next to this script
 ENV_FILE="${SCRIPT_DIR}/.env"
@@ -47,10 +62,17 @@ if [[ "$(uname -s)" == "Linux" ]]; then
   DOCKER_FLAGS+=(--user "$(id -u):$(id -g)")
 fi
 
+# Build optional --resume flag
+RESUME_ARGS=()
+if [[ -n "${RESUME_HASH:-}" ]]; then
+  RESUME_ARGS+=(--resume "$RESUME_HASH")
+fi
+
 exec docker compose \
   --project-directory "$SCRIPT_DIR" \
   run \
   "${DOCKER_FLAGS[@]}" \
   claude \
   --dangerously-skip-permissions \
+  "${RESUME_ARGS[@]}" \
   "$@"

@@ -23,8 +23,9 @@ services:
     volumes:
       # Host workspace — WORKSPACE_DIR is set by run.sh to the caller's cwd
       - "${WORKSPACE_DIR:-.}:/workspace:rw"
-      # Persistent Claude config, history, and sessions
-      - claude-config:/home/claude/.claude
+      # Persistent Claude home — bind-mounted so sessions survive container removal
+      # CLAUDE_HOME_DIR is set by run.sh / Makefile (default: ~/.dangerously-safe-container/claude-home)
+      - "${CLAUDE_HOME_DIR}:/home/claude:rw"
 
     environment:
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:?ANTHROPIC_API_KEY must be set}"
@@ -40,6 +41,3 @@ services:
     tty: true
     restart: "no"
 
-volumes:
-  claude-config:
-    name: dangerously-safe-claude-config
