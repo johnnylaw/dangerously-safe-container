@@ -28,7 +28,7 @@ services:
       - "${CLAUDE_HOME_DIR}:/home/claude:rw"
 
     environment:
-      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:?ANTHROPIC_API_KEY must be set}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
       ANTHROPIC_BASE_URL: "${ANTHROPIC_BASE_URL:-}"
       CLAUDE_MODEL: "${CLAUDE_MODEL:-}"
       NO_COLOR: "${NO_COLOR:-}"

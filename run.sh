@@ -123,10 +123,17 @@ if [[ -f "$ENV_FILE" ]]; then
 fi
 
 if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
-  echo >&2 "error: ANTHROPIC_API_KEY is not set."
-  echo >&2 "  export ANTHROPIC_API_KEY=sk-ant-..."
-  echo >&2 "  or add it to ${SCRIPT_DIR}/.env"
-  exit 1
+  # No API key — check if there's already a stored OAuth session in the persistent home dir.
+  # Pro/Max subscribers authenticate via 'claude login' rather than an API key.
+  STORED_AUTH="${CLAUDE_HOME_DIR}/.claude.json"
+  if [[ ! -f "$STORED_AUTH" ]] || ! grep -q '"oauthToken"\|"accessToken"' "$STORED_AUTH" 2>/dev/null; then
+    echo >&2 "warning: ANTHROPIC_API_KEY is not set and no saved login session was found."
+    echo >&2 ""
+    echo >&2 "API key users:  export ANTHROPIC_API_KEY=sk-ant-...  (or add to ${SCRIPT_DIR}/.env)"
+    echo >&2 "Pro/Max users:  run the container once, then run 'claude login' inside it."
+    echo >&2 ""
+    echo >&2 "Continuing — Claude will prompt you to log in if needed."
+  fi
 fi
 
 IMAGE_NAME="dangerously-safe-container:latest"
