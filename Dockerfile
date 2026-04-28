@@ -37,8 +37,12 @@ RUN usermod -l claude -d /home/claude -m node \
     && echo "claude ALL=(ALL) NOPASSWD: /usr/bin/apt-get, /usr/bin/apt" >> /etc/sudoers.d/claude \
     && chmod 0440 /etc/sudoers.d/claude
 
-# Install Claude Code via the official native installer
+# Install Claude Code via the official native installer. Run as the claude
+# user so the binary lands in /home/claude/.local/bin (on PATH at runtime),
+# not /root/.local/bin where the runtime user can't see it.
+USER claude
 RUN curl -fsSL https://claude.ai/install.sh | bash
+USER root
 
 # Set up mount points and default config file
 RUN mkdir -p /workspace \
