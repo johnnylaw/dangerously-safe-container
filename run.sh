@@ -40,6 +40,15 @@ if [[ -f "$HOST_GSD_VERSION_FILE" ]]; then
   HOST_GSD_VER=$(cat "$HOST_GSD_VERSION_FILE")
   CONTAINER_GSD_VER=$(cat "${CONTAINER_CLAUDE}/get-shit-done/VERSION" 2>/dev/null || echo "")
 
+  # Migrate old layout: GSD moved from commands/gsd/ to skills/gsd-*/.
+  # If the container still has the legacy commands/gsd dir, force a resync.
+  if [[ -d "${CONTAINER_CLAUDE}/commands/gsd" ]]; then
+    echo "Migrating container: removing legacy commands/gsd (GSD now lives in skills/)..."
+    rm -rf "${CONTAINER_CLAUDE}/commands/gsd"
+    rmdir "${CONTAINER_CLAUDE}/commands" 2>/dev/null || true
+    CONTAINER_GSD_VER=""
+  fi
+
   if [[ "$HOST_GSD_VER" != "$CONTAINER_GSD_VER" ]]; then
     echo "Syncing GSD ${HOST_GSD_VER} into container home..."
 
@@ -47,9 +56,12 @@ if [[ -f "$HOST_GSD_VERSION_FILE" ]]; then
     mkdir -p "${CONTAINER_CLAUDE}/get-shit-done"
     cp -r "${HOST_CLAUDE}/get-shit-done/." "${CONTAINER_CLAUDE}/get-shit-done/"
 
-    # Slash commands
-    mkdir -p "${CONTAINER_CLAUDE}/commands/gsd"
-    cp -r "${HOST_CLAUDE}/commands/gsd/." "${CONTAINER_CLAUDE}/commands/gsd/"
+    # Skills (gsd-* only — GSD commands are now skills, not slash commands)
+    mkdir -p "${CONTAINER_CLAUDE}/skills"
+    for skill_dir in "${HOST_CLAUDE}"/skills/gsd-*/; do
+      [[ -d "$skill_dir" ]] || continue
+      cp -r "$skill_dir" "${CONTAINER_CLAUDE}/skills/"
+    done
 
     # Agent definitions (gsd-* only — pragmatic-engineer et al. not GSD-owned)
     mkdir -p "${CONTAINER_CLAUDE}/agents"
