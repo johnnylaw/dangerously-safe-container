@@ -30,6 +30,22 @@ if [[ ! -f "${CLAUDE_HOME_DIR}/.claude.json" ]]; then
   echo '{}' > "${CLAUDE_HOME_DIR}/.claude.json"
 fi
 
+# Mirror the host's Claude Code login into the container so we don't have to
+# 'claude login' every restart. Host (macOS) stores OAuth tokens in the
+# Keychain under "Claude Code-credentials"; container (Linux) reads them from
+# ~/.claude/.credentials.json. The Keychain blob is the same JSON the file
+# expects, so we can pipe it straight through.
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  if HOST_CREDS=$(security find-generic-password -w -s "Claude Code-credentials" -a "$USER" 2>/dev/null) \
+       && [[ -n "$HOST_CREDS" ]]; then
+    CRED_FILE="${CLAUDE_HOME_DIR}/.claude/.credentials.json"
+    if [[ "$(cat "$CRED_FILE" 2>/dev/null)" != "$HOST_CREDS" ]]; then
+      printf '%s' "$HOST_CREDS" > "$CRED_FILE"
+      chmod 600 "$CRED_FILE"
+    fi
+  fi
+fi
+
 # Sync GSD from this machine's ~/.claude into the container's claude home.
 # Only copies when the host version differs from the container's installed version.
 HOST_CLAUDE="${HOME}/.claude"
