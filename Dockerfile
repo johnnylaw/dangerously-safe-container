@@ -37,12 +37,11 @@ RUN usermod -l claude -d /home/claude -m node \
     && echo "claude ALL=(ALL) NOPASSWD: /usr/bin/apt-get, /usr/bin/apt" >> /etc/sudoers.d/claude \
     && chmod 0440 /etc/sudoers.d/claude
 
-# Install Claude Code via the official native installer. Run as the claude
-# user so the binary lands in /home/claude/.local/bin (on PATH at runtime),
-# not /root/.local/bin where the runtime user can't see it.
-USER claude
-RUN curl -fsSL https://claude.ai/install.sh | bash
-USER root
+# Install Claude Code globally. The package's platform-specific native binary
+# (~230MB) ships via optionalDependencies under node_modules/, with a wrapper
+# symlink at /usr/local/bin/claude — both outside the /home/claude bind mount.
+RUN npm install -g @anthropic-ai/claude-code \
+    && npm cache clean --force
 
 # Set up mount points and default config file
 RUN mkdir -p /workspace \
